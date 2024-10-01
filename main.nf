@@ -75,38 +75,36 @@ process MANY_SMALL_FILES {
     val num_files
 
     output:
-    path 'generated_files', emit: files
+    path "file_*.bin", emit: files
     path 'checksum.txt', emit: checksum
 
     script:
     """
-    mkdir generated_files
     for i in \$(seq 1 ${num_files}); do
-        dd if=/dev/zero of=generated_files/file_\$i.bin bs=1M count=10
+        dd if=/dev/zero of=file_\$i.bin bs=1M count=10
     done
 
     # Generate MD5 checksums
-    cd generated_files
-    md5sum * > ../checksum.txt
+    md5sum file_* > checksum.txt
     """
 }
 
 process COUNT_FILES {
     input:
-    path files_folder
+    path "files/*"
 
     output:
     stdout
 
     script:
     """
-    find ${files_folder}/* -type f | wc -l
+    find files/* | wc -l
     """
 }
 
 process RENAME_FILES {
     input:
-    path files_folder
+    path "files/*"
 
     output:
     path 'renamed_files'
@@ -114,7 +112,7 @@ process RENAME_FILES {
     script:
     """
     # First, create a copy of the original folder
-    cp -LR ${files_folder} original_files
+    cp -LR files original_files
 
     # Now create the renamed_files directory and move files there
     mkdir renamed_files
@@ -126,14 +124,14 @@ process RENAME_FILES {
 
 process COMPRESS_FILES {
     input:
-    path files_folder
+    path "files/*"
 
     output:
     path 'compressed_files.tar.gz'
 
     script:
     """
-    tar -czvf compressed_files.tar.gz -C \$(readlink -f ${files_folder}) .
+    tar -czvhf compressed_files.tar.gz -C \$(readlink -f files) .
     """
 }
 
@@ -146,11 +144,10 @@ process UNCOMPRESS_FILES {
     script:
     """
     mkdir uncompressed_files
-    tar -xzvf ${compressed_file} -C uncompressed_files
+    tar -xzvf ${compressed_file}
 
     # Verify checksums
-    cd uncompressed_files
-    md5sum -c ../${original_checksum} > verification_results.txt
+    md5sum -c ${original_checksum} > verification_results.txt
     if grep -q 'FAILED' verification_results.txt; then
         echo "Checksum verification FAILED for some files"
         exit 1
