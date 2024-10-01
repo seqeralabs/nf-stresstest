@@ -1,0 +1,37 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema",
+  "$id": "https://raw.githubusercontent.com//master/nextflow_schema.json",
+  "title": " pipeline parameters",
+  "description": "",
+  "type": "object",
+  "definitions": {
+    "input_output": {
+      "title": "Input/Output",
+      "type": "object",
+      "description": "",
+      "default": "",
+      "properties": {
+        "total_reads": {
+          "type": "integer",
+          "default": 10000,
+          "description": "Number of reads to generate per GENERATE_READS process."
+        },
+        "num_files": {
+          "type": "integer",
+          "default": 10,
+          "description": "Number of GENERATE_READS processes which generate a single FASTQ file."
+        },
+        "small_files": {
+          "type": "integer",
+          "default": 1000,
+          "description": "Number of miniature text files to generate in MANY_SMALL_FILES process"
+        }
+      }
+    }
+  },
+  "allOf": [
+    {
+      "$ref": "#/definitions/input_output"
+    }
+  ]
+}
