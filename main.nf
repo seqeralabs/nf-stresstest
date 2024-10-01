@@ -163,7 +163,10 @@ workflow {
     generate_params = Channel.from(1..params.num_files).map { it -> tuple(params.total_reads, it) }
 
     // Run GENERATE_FAKE_FASTQ processes in parallel
-    fake_fastq_files = GENERATE_FAKE_FASTQ(generate_params)
+    GENERATE_FAKE_FASTQ(generate_params)
+
+    // Compress the FASTQ files
+    fake_fastq_files = COMPRESS_FASTQ(GENERATE_FAKE_FASTQ.out)
 
     // Collect all generated FASTQ files
     collected_fastq_files = fake_fastq_files.collect()
@@ -171,20 +174,22 @@ workflow {
     // Concatenate all FASTQ files
     CONCATENATE_FASTQ(collected_fastq_files)
 
-    // Compress the concatenated FASTQ file
-    COMPRESS_FASTQ(CONCATENATE_FASTQ.out)
-
     // Generate many small files in a single process
-    small_files = MANY_SMALL_FILES(params.small_files)
+    MANY_SMALL_FILES(params.small_files)
+
+    all_files = Channel.empty()
+                .mix( MANY_SMALL_FILES.out.files.filter{ params.use_small_files } )
+                .mix( fake_fastq_files.filter{ params.use_fastq_files } )
+                .collect()
 
     // Count how many files are generated
-    COUNT_FILES(small_files.files) | view { "Number of small files: $it" }
+    COUNT_FILES(all_files) | view { "Number of small files: $it" }
 
     // Rename all these files
-    RENAME_FILES(small_files.files)
+    RENAME_FILES(all_files)
 
-    compressed = COMPRESS_FILES(small_files.files)
+    compressed = COMPRESS_FILES(all_files)
 
-    UNCOMPRESS_FILES(compressed, small_files.checksum)
+    // UNCOMPRESS_FILES(compressed, small_files.checksum)
 
 }

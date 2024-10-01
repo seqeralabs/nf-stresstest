@@ -41,6 +41,15 @@
         "skip": {
           "type": "string",
           "description": "Selectively disable a tool. If this option is enabled a tool will be ignored. Note: this may affect downstream tools."
+        },
+        "use_small_files": {
+          "type": "boolean",
+          "default": true,
+          "description": "Add small files to downstream operations tests  (e.g. count, rename, compress)."
+        },
+        "use_fastq_files": {
+          "type": "boolean",
+          "description": "Use FASTQ files for downstream operations tests  (e.g. count, rename, compress)."
         }
       }
     }
