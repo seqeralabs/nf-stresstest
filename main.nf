@@ -66,7 +66,7 @@ process COMPRESS_FASTQ {
 
     script:
     """
-    pigz -p 8 -c ${fastq_file} > ${fastq_file}.gz
+    pigz -p ${task.cpus} -c ${fastq_file} > ${fastq_file}.gz
     """
 }
 
