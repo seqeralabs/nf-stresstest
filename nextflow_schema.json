@@ -27,11 +27,30 @@
           "description": "Number of miniature text files to generate in MANY_SMALL_FILES process"
         }
       }
+    },
+    "tool_selection": {
+      "title": "Tool Selection",
+      "type": "object",
+      "description": "",
+      "default": "",
+      "properties": {
+        "run": {
+          "type": "string",
+          "description": "Selectively run a tool. If this option is enabled only tools with this name will be ran. Note: this may affect downstream tools."
+        },
+        "skip": {
+          "type": "string",
+          "description": "Selectively disable a tool. If this option is enabled a tool will be ignored. Note: this may affect downstream tools."
+        }
+      }
     }
   },
   "allOf": [
     {
       "$ref": "#/definitions/input_output"
+    },
+    {
+      "$ref": "#/definitions/tool_selection"
     }
   ]
 }
