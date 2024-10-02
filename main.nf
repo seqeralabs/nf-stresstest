@@ -1,29 +1,32 @@
 process GENERATE_FAKE_FASTQ {
+    tag "${file_index}"
+
     container 'community.wave.seqera.io/library/numpy:2.1.1--3063fc3d721f2cdf'
 
     input:
-    tuple val(total_reads), val(file_index)
+    tuple val(total_reads), val(file_index), val(length)
 
     output:
-    path "random_sample_${file_index}.fastq"
+    path "random_sample_${file_index}.fastq", emit: fastq
+    path "checksum.txt"                    , emit: checksum
 
     script:
     """
     #!/usr/bin/env python3
 
-    import numpy as np
+    import hashlib
     import sys
+    import numpy as np
 
-    def generate_random_sequence(length=53676):
+    def generate_random_sequence(length=${length}):
         bases = np.array(['A', 'C', 'G', 'T'], dtype='|S1')
         return np.random.choice(bases, size=length).tobytes().decode('ascii')
 
-    def generate_random_quality(length=53676):
+    def generate_random_quality(length=${length}):
         quality_ints = np.random.randint(0, 42, size=length) + 33
         return ''.join(chr(q) for q in quality_ints)
 
-    def generate_fake_fastq(total_reads, file_index):
-        output_file = f"random_sample_{file_index}.fastq"
+    def generate_fake_fastq(total_reads, file_index, output_file):
 
         with open(output_file, 'w') as f:
             for i in range(1, total_reads + 1):
@@ -38,75 +41,96 @@ process GENERATE_FAKE_FASTQ {
 
         print(f"Generated {output_file} with {total_reads} reads.")
 
-    generate_fake_fastq(${total_reads}, ${file_index})
+    def calculate_md5(file_path):
+        hash_md5 = hashlib.md5()
+        with open(file_path, "rb") as f:
+            for chunk in iter(lambda: f.read(4096), b""):
+                hash_md5.update(chunk)
+        return hash_md5.hexdigest()
+
+    output_file = f"random_sample_${file_index}.fastq"
+
+    generate_fake_fastq(${total_reads}, ${file_index}, output_file)
+
+    checksum = calculate_md5(output_file)
+
+    with open(f"checksum.txt", 'w') as checksum_file:
+        checksum_file.write(f"{checksum}  {output_file}\\n")
     """
 }
 
-process CONCATENATE_FASTQ {
-    input:
-    path fastq_files
-
-    output:
-    path 'concatenated_samples.fastq'
-
-    script:
-    """
-    cat ${fastq_files} > concatenated_samples.fastq
-    """
-}
-
-process COMPRESS_FASTQ {
-    container 'community.wave.seqera.io/library/pigz:2.8--cc287835d69f818b'
+process ZERO_FILES {
 
     input:
-    path fastq_file
+    tuple val(num_files), val(size)
 
     output:
-    path "${fastq_file}.gz", emit: compressed_fastq
-
-    script:
-    """
-    pigz -p ${task.cpus} -c ${fastq_file} > ${fastq_file}.gz
-    """
-}
-
-process MANY_SMALL_FILES {
-    input:
-    val num_files
-
-    output:
-    path 'generated_files', emit: files
+    path "file_*.bin", emit: files
     path 'checksum.txt', emit: checksum
 
     script:
     """
-    mkdir generated_files
     for i in \$(seq 1 ${num_files}); do
-        dd if=/dev/zero of=generated_files/file_\$i.bin bs=1M count=10
+        dd if=/dev/zero of=file_\$i.bin bs=1M count=${size}
     done
 
     # Generate MD5 checksums
-    cd generated_files
-    md5sum * > ../checksum.txt
+    md5sum file_* > checksum.txt
     """
 }
 
+process CONCATENATE_FILES {
+
+    input:
+    path input_files
+
+    output:
+    path 'concatenated.*'
+
+    script:
+    def extension = input_files[0].extension
+    """
+    cat ${input_files} > concatenated.${extension}
+    """
+}
+
+process COMPRESS_FILES {
+
+    tag "${input_file}"
+
+    container 'community.wave.seqera.io/library/pigz:2.8--cc287835d69f818b'
+
+    input:
+    path input_file
+
+    output:
+    path "${input_file}.gz", emit: compressed_file
+
+    script:
+    """
+    pigz -p ${task.cpus} -c ${input_file} > ${input_file}.gz
+    """
+}
+
+
+
 process COUNT_FILES {
     input:
-    path files_folder
+    path "files/*"
 
     output:
     stdout
 
     script:
     """
-    find ${files_folder}/* -type f | wc -l
+    find files/* | wc -l
     """
 }
 
 process RENAME_FILES {
+
     input:
-    path files_folder
+    path "files/*"
 
     output:
     path 'renamed_files'
@@ -114,7 +138,7 @@ process RENAME_FILES {
     script:
     """
     # First, create a copy of the original folder
-    cp -LR ${files_folder} original_files
+    cp -LR files original_files
 
     # Now create the renamed_files directory and move files there
     mkdir renamed_files
@@ -124,24 +148,27 @@ process RENAME_FILES {
     """
 }
 
-process COMPRESS_FILES {
+process TAR_FILES {
     input:
-    path files_folder
+    path "files/*"
 
     output:
     path 'compressed_files.tar.gz'
 
     script:
     """
-    tar -czvf compressed_files.tar.gz -C \$(readlink -f ${files_folder}) .
+    tar -czvhf compressed_files.tar.gz -C files .
     """
 }
 
 
-process UNCOMPRESS_FILES {
+process UNTAR_FILES {
     input:
     path compressed_file
     path original_checksum
+
+    output:
+    path "verification_results.txt"
 
     script:
     """
@@ -150,7 +177,7 @@ process UNCOMPRESS_FILES {
 
     # Verify checksums
     cd uncompressed_files
-    md5sum -c ../${original_checksum} > verification_results.txt
+    md5sum -c ../${original_checksum} > ../verification_results.txt
     if grep -q 'FAILED' verification_results.txt; then
         echo "Checksum verification FAILED for some files"
         exit 1
@@ -162,32 +189,51 @@ process UNCOMPRESS_FILES {
 
 workflow {
 
-    // Create a channel with the parameters for each GENERATE_FAKE_FASTQ process
-    generate_params = Channel.from(1..params.num_files).map { it -> tuple(params.total_reads, it) }
 
-    // Run GENERATE_FAKE_FASTQ processes in parallel
-    fake_fastq_files = GENERATE_FAKE_FASTQ(generate_params)
+    mixed_files   = Channel.empty()
+    checksum_file = Channel.empty()
 
-    // Collect all generated FASTQ files
-    collected_fastq_files = fake_fastq_files.collect()
+    if ( params.enable_fastq_files ) {
+        // Create a channel with the parameters for each GENERATE_FAKE_FASTQ process
+        generate_params = Channel.from(1..params.fastq_n_files)
+                            .map { it -> tuple(params.fastq_n_reads, it, params.fastq_read_length) }
 
-    // Concatenate all FASTQ files
-    CONCATENATE_FASTQ(collected_fastq_files)
+        // Run GENERATE_FAKE_FASTQ processes in parallel
+        GENERATE_FAKE_FASTQ(generate_params)
 
-    // Compress the concatenated FASTQ file
-    COMPRESS_FASTQ(CONCATENATE_FASTQ.out)
+        if ( params.process_fastq_files ) {
+            mixed_files = mixed_files.mix( GENERATE_FAKE_FASTQ.out.fastq.filter{ params.process_fastq_files } )
+            checksum_file = checksum_file.mix( GENERATE_FAKE_FASTQ.out.checksum.filter{ params.process_fastq_files } )
+        }
+    }
 
-    // Generate many small files in a single process
-    small_files = MANY_SMALL_FILES(params.small_files)
+    if ( params.enable_zero_files ) {
+        // Generate many small files in a single process
+        ZERO_FILES([params.zero_n_files, params.zero_file_size])
+
+        if ( params.process_zero_files ) {
+            mixed_files = mixed_files.mix( ZERO_FILES.out.files.filter{ params.process_zero_files } )
+            checksum_file.mix( ZERO_FILES.out.checksum.filter { params.process_zero_files } )
+        }
+    }
+
+    // Compress the files
+    compressed_files = COMPRESS_FILES(mixed_files.flatten())
+
+    // Collect all generated files
+    collected_files = mixed_files.collect()
+
+    // Concatenate all files
+    CONCATENATE_FILES(collected_files)
 
     // Count how many files are generated
-    COUNT_FILES(small_files.files) | view { "Number of small files: $it" }
+    COUNT_FILES(collected_files) | view { "Number of small files: $it" }
 
     // Rename all these files
-    RENAME_FILES(small_files.files)
+    RENAME_FILES(collected_files)
 
-    compressed = COMPRESS_FILES(small_files.files)
+    TAR_FILES(collected_files)
 
-    UNCOMPRESS_FILES(compressed, small_files.checksum)
+    UNTAR_FILES(TAR_FILES.out, checksum_file.collectFile())
 
 }
