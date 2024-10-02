@@ -25,6 +25,11 @@
           "type": "integer",
           "default": 1000,
           "description": "Number of miniature text files to generate in MANY_SMALL_FILES process"
+        },
+        "read_length": {
+          "type": "integer",
+          "default": 50,
+          "description": "Length of FASTQ reads to generate."
         }
       }
     },
