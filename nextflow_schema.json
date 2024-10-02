@@ -8,7 +8,7 @@
     "generate_fastq_file_options": {
       "title": "Generate FASTQ file options",
       "type": "object",
-      "description": "FASTQ files that are generated within the pipeline that are realistic representations of sequencing data.",
+      "description": "Options relating to FASTQ files that are generated within the pipeline that are realistic representations of sequencing data.",
       "default": "",
       "properties": {
         "enable_fastq_files": {
@@ -41,7 +41,7 @@
     "zero_file_options": {
       "title": "Zero file options",
       "type": "object",
-      "description": "Files that are generated within the pipeline composed entirely of zeros to be used for small file manipulation.",
+      "description": "Options that are related to files that are generated within the pipeline composed entirely of zeros to be used for small file manipulation.",
       "default": "",
       "properties": {
         "enable_zero_files": {
