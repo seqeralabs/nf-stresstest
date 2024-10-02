@@ -59,6 +59,26 @@ process GENERATE_FAKE_FASTQ {
     """
 }
 
+process ZERO_FILES {
+
+    input:
+    tuple val(num_files), val(size)
+
+    output:
+    path "file_*.bin", emit: files
+    path 'checksum.txt', emit: checksum
+
+    script:
+    """
+    for i in \$(seq 1 ${num_files}); do
+        dd if=/dev/zero of=file_\$i.bin bs=1M count=${size}
+    done
+
+    # Generate MD5 checksums
+    md5sum file_* > checksum.txt
+    """
+}
+
 process CONCATENATE_FILES {
 
     input:
@@ -92,25 +112,7 @@ process COMPRESS_FILES {
     """
 }
 
-process ZERO_FILES {
 
-    input:
-    val num_files
-
-    output:
-    path "file_*.bin", emit: files
-    path 'checksum.txt', emit: checksum
-
-    script:
-    """
-    for i in \$(seq 1 ${num_files}); do
-        dd if=/dev/zero of=file_\$i.bin bs=1M count=10
-    done
-
-    # Generate MD5 checksums
-    md5sum file_* > checksum.txt
-    """
-}
 
 process COUNT_FILES {
     input:
@@ -187,20 +189,33 @@ process UNTAR_FILES {
 
 workflow {
 
-    // Create a channel with the parameters for each GENERATE_FAKE_FASTQ process
-    generate_params = Channel.from(1..params.num_files)
-                        .map { it -> tuple(params.total_reads, it, params.read_length) }
 
-    // Run GENERATE_FAKE_FASTQ processes in parallel
-    GENERATE_FAKE_FASTQ(generate_params)
-    
-    // Generate many small files in a single process
-    ZERO_FILES(params.small_files)
+    mixed_files   = Channel.empty()
+    checksum_file = Channel.empty()
 
-    // Combine all files
-    mixed_files = Channel.empty()
-            .mix( ZERO_FILES.out.files.filter{ params.use_small_files } )
-            .mix( GENERATE_FAKE_FASTQ.out.fastq.filter{ params.use_fastq_files } )
+    if ( params.enable_fastq_files ) {
+        // Create a channel with the parameters for each GENERATE_FAKE_FASTQ process
+        generate_params = Channel.from(1..params.fastq_n_files)
+                            .map { it -> tuple(params.fastq_n_reads, it, params.fastq_read_length) }
+
+        // Run GENERATE_FAKE_FASTQ processes in parallel
+        GENERATE_FAKE_FASTQ(generate_params)
+
+        if ( params.process_fastq_files ) {
+            mixed_files = mixed_files.mix( GENERATE_FAKE_FASTQ.out.fastq.filter{ params.process_fastq_files } )
+            checksum_file = checksum_file.mix( GENERATE_FAKE_FASTQ.out.checksum.filter{ params.process_fastq_files } )
+        }
+    }
+
+    if ( params.enable_zero_files ) {
+        // Generate many small files in a single process
+        ZERO_FILES([params.zero_n_files, params.zero_file_size])
+
+        if ( params.process_zero_files ) {
+            mixed_files = mixed_files.mix( ZERO_FILES.out.files.filter{ params.process_zero_files } )
+            checksum_file.mix( ZERO_FILES.out.checksum.filter { params.process_zero_files } )
+        }
+    }
 
     // Compress the files
     compressed_files = COMPRESS_FILES(mixed_files.flatten())
@@ -217,13 +232,8 @@ workflow {
     // Rename all these files
     RENAME_FILES(collected_files)
 
-    compressed = TAR_FILES(collected_files)
+    TAR_FILES(collected_files)
 
-    checksum_file = Channel.empty()
-        .mix(GENERATE_FAKE_FASTQ.out.checksum)
-        .mix(ZERO_FILES.out.checksum)
-        .collectFile()
-
-    UNTAR_FILES(compressed, checksum_file)
+    UNTAR_FILES(TAR_FILES.out, checksum_file.collectFile())
 
 }

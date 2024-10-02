@@ -5,31 +5,65 @@
   "description": "",
   "type": "object",
   "definitions": {
-    "input_output": {
-      "title": "Input/Output",
+    "generate_fastq_file_options": {
+      "title": "Generate FASTQ file options",
       "type": "object",
       "description": "",
       "default": "",
       "properties": {
-        "total_reads": {
-          "type": "integer",
-          "default": 10000,
-          "description": "Number of reads to generate per GENERATE_READS process."
+        "enable_fastq_files": {
+          "type": "boolean",
+          "default": true,
+          "description": "Enable generation of FASTQ files for filesystem testing."
         },
-        "num_files": {
+        "fastq_n_files": {
           "type": "integer",
           "default": 10,
-          "description": "Number of GENERATE_READS processes which generate a single FASTQ file."
+          "description": "Number of GENERATE_FASTQ processes which generate a single FASTQ file."
         },
-        "small_files": {
+        "fastq_n_reads": {
+          "type": "integer",
+          "default": 10000,
+          "description": "Number of reads to generate per GENERATE_FASTQ process."
+        },
+        "fastq_read_length": {
+          "type": "integer",
+          "default": 53676,
+          "description": "Length of FASTQ reads to generate."
+        },
+        "process_fastq_files": {
+          "type": "boolean",
+          "description": "Whether to include FASTQ files in downstream file operations such as compress, archive, rename etc.",
+          "hidden": true
+        }
+      }
+    },
+    "dev_zero_file_options": {
+      "title": "/dev/zero file options",
+      "type": "object",
+      "description": "",
+      "default": "",
+      "properties": {
+        "enable_zero_files": {
+          "type": "boolean",
+          "default": true,
+          "description": "Enable generation of files from /dev/zero for filesystem testing."
+        },
+        "zero_n_files": {
           "type": "integer",
           "default": 1000,
-          "description": "Number of miniature text files to generate in MANY_SMALL_FILES process"
+          "description": "Number of miniature text files to generate from /dev/zero."
         },
-        "read_length": {
+        "zero_file_size": {
           "type": "integer",
-          "default": 50,
-          "description": "Length of FASTQ reads to generate."
+          "default": 10,
+          "description": "Size of zero file to generate in megabytes."
+        },
+        "process_zero_files": {
+          "type": "boolean",
+          "default": true,
+          "description": "Whether to include zero files in downstream file operations such as compress, archive, rename etc.",
+          "hidden": true
         }
       }
     },
@@ -46,22 +80,16 @@
         "skip": {
           "type": "string",
           "description": "Selectively disable a tool. If this option is enabled a tool will be ignored. Note: this may affect downstream tools."
-        },
-        "use_small_files": {
-          "type": "boolean",
-          "default": true,
-          "description": "Add small files to downstream operations tests  (e.g. count, rename, compress)."
-        },
-        "use_fastq_files": {
-          "type": "boolean",
-          "description": "Use FASTQ files for downstream operations tests  (e.g. count, rename, compress)."
         }
       }
     }
   },
   "allOf": [
     {
-      "$ref": "#/definitions/input_output"
+      "$ref": "#/definitions/generate_fastq_file_options"
+    },
+    {
+      "$ref": "#/definitions/dev_zero_file_options"
     },
     {
       "$ref": "#/definitions/tool_selection"
