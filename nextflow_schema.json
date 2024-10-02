@@ -1,27 +1,27 @@
 {
   "$schema": "http://json-schema.org/draft-07/schema",
   "$id": "https://raw.githubusercontent.com//master/nextflow_schema.json",
-  "title": " pipeline parameters",
+  "title": "seqeralabs/nf-stresstest pipeline parameters",
   "description": "",
   "type": "object",
   "definitions": {
-    "generate_fastq_file_options": {
-      "title": "Generate FASTQ file options",
+    "vertical_testing_options": {
+      "title": "Options for vertical testing",
       "type": "object",
-      "description": "",
+      "description": "Vertical testing allows you to create and test files of increasing size.",
       "default": "",
       "properties": {
-        "enable_fastq_files": {
+        "skip_vertical_testing": {
           "type": "boolean",
           "default": true,
           "description": "Enable generation of FASTQ files for filesystem testing."
         },
-        "fastq_n_files": {
+        "vertical_testing_file_count": {
           "type": "integer",
           "default": 10,
           "description": "Number of GENERATE_FASTQ processes which generate a single FASTQ file."
         },
-        "fastq_n_reads": {
+        "fastq_num_reads": {
           "type": "integer",
           "default": 10000,
           "description": "Number of reads to generate per GENERATE_FASTQ process."
@@ -38,23 +38,23 @@
         }
       }
     },
-    "dev_zero_file_options": {
-      "title": "/dev/zero file options",
+    "horizontal_testing_options": {
+      "title": "Options for horizontal testing",
       "type": "object",
-      "description": "",
+      "description": "Horizontal testing allows you to create and test files of increasing number.",
       "default": "",
       "properties": {
-        "enable_zero_files": {
+        "skip_horizontal_testing": {
           "type": "boolean",
           "default": true,
           "description": "Enable generation of files from /dev/zero for filesystem testing."
         },
-        "zero_n_files": {
+        "horizontal_testing_file_count": {
           "type": "integer",
           "default": 1000,
           "description": "Number of miniature text files to generate from /dev/zero."
         },
-        "zero_file_size": {
+        "horizontal_testing_file_size": {
           "type": "integer",
           "default": 10,
           "description": "Size of zero file to generate in megabytes."
@@ -86,10 +86,10 @@
   },
   "allOf": [
     {
-      "$ref": "#/definitions/generate_fastq_file_options"
+      "$ref": "#/definitions/vertical_testing_options"
     },
     {
-      "$ref": "#/definitions/dev_zero_file_options"
+      "$ref": "#/definitions/horizontal_testing_options"
     },
     {
       "$ref": "#/definitions/tool_selection"
