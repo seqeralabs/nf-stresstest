@@ -75,38 +75,36 @@ process MANY_SMALL_FILES {
     val num_files
 
     output:
-    path 'generated_files', emit: files
+    path "file_*.bin", emit: files
     path 'checksum.txt', emit: checksum
 
     script:
     """
-    mkdir generated_files
     for i in \$(seq 1 ${num_files}); do
-        dd if=/dev/zero of=generated_files/file_\$i.bin bs=1M count=10
+        dd if=/dev/zero of=file_\$i.bin bs=1M count=10
     done
 
     # Generate MD5 checksums
-    cd generated_files
-    md5sum * > ../checksum.txt
+    md5sum file_* > checksum.txt
     """
 }
 
 process COUNT_FILES {
     input:
-    path files_folder
+    path "files/*"
 
     output:
     stdout
 
     script:
     """
-    find ${files_folder}/* -type f | wc -l
+    find files/* | wc -l
     """
 }
 
 process RENAME_FILES {
     input:
-    path files_folder
+    path "files/*"
 
     output:
     path 'renamed_files'
@@ -114,7 +112,7 @@ process RENAME_FILES {
     script:
     """
     # First, create a copy of the original folder
-    cp -LR ${files_folder} original_files
+    cp -LR files original_files
 
     # Now create the renamed_files directory and move files there
     mkdir renamed_files
@@ -126,14 +124,14 @@ process RENAME_FILES {
 
 process COMPRESS_FILES {
     input:
-    path files_folder
+    path "files/*"
 
     output:
     path 'compressed_files.tar.gz'
 
     script:
     """
-    tar -czvf compressed_files.tar.gz -C \$(readlink -f ${files_folder}) .
+    tar -czvhf compressed_files.tar.gz -C \$(readlink -f files) .
     """
 }
 
@@ -146,11 +144,10 @@ process UNCOMPRESS_FILES {
     script:
     """
     mkdir uncompressed_files
-    tar -xzvf ${compressed_file} -C uncompressed_files
+    tar -xzvf ${compressed_file}
 
     # Verify checksums
-    cd uncompressed_files
-    md5sum -c ../${original_checksum} > verification_results.txt
+    md5sum -c ${original_checksum} > verification_results.txt
     if grep -q 'FAILED' verification_results.txt; then
         echo "Checksum verification FAILED for some files"
         exit 1
@@ -166,7 +163,10 @@ workflow {
     generate_params = Channel.from(1..params.num_files).map { it -> tuple(params.total_reads, it) }
 
     // Run GENERATE_FAKE_FASTQ processes in parallel
-    fake_fastq_files = GENERATE_FAKE_FASTQ(generate_params)
+    GENERATE_FAKE_FASTQ(generate_params)
+
+    // Compress the FASTQ files
+    fake_fastq_files = COMPRESS_FASTQ(GENERATE_FAKE_FASTQ.out)
 
     // Collect all generated FASTQ files
     collected_fastq_files = fake_fastq_files.collect()
@@ -174,20 +174,22 @@ workflow {
     // Concatenate all FASTQ files
     CONCATENATE_FASTQ(collected_fastq_files)
 
-    // Compress the concatenated FASTQ file
-    COMPRESS_FASTQ(CONCATENATE_FASTQ.out)
-
     // Generate many small files in a single process
-    small_files = MANY_SMALL_FILES(params.small_files)
+    MANY_SMALL_FILES(params.small_files)
+
+    all_files = Channel.empty()
+                .mix( MANY_SMALL_FILES.out.files.filter{ params.use_small_files } )
+                .mix( fake_fastq_files.filter{ params.use_fastq_files } )
+                .collect()
 
     // Count how many files are generated
-    COUNT_FILES(small_files.files) | view { "Number of small files: $it" }
+    COUNT_FILES(all_files) | view { "Number of small files: $it" }
 
     // Rename all these files
-    RENAME_FILES(small_files.files)
+    RENAME_FILES(all_files)
 
-    compressed = COMPRESS_FILES(small_files.files)
+    compressed = COMPRESS_FILES(all_files)
 
-    UNCOMPRESS_FILES(compressed, small_files.checksum)
+    // UNCOMPRESS_FILES(compressed, small_files.checksum)
 
 }
