@@ -206,6 +206,6 @@ workflow {
     RENAME_AND_COMPRESS_FILES(small_files.files)
 
     // Extract and verify checksum of all the files
-    UNCOMPRESS_FILES(RENAME_AND_COMPRESS_FILES.out, small_files.checksum)
+    UNCOMPRESS_AND_VERIFY_FILES(RENAME_AND_COMPRESS_FILES.out, small_files.checksum)
 
 }
