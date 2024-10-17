@@ -55,6 +55,19 @@ process CONCATENATE_FASTQ {
     """
 }
 
+process CHECKSUM_FASTQ {
+    input:
+    path fastq_file
+
+    output:
+    path 'checksum.md5'
+
+    script:
+    """
+    md5sum ${fastq_file} > checksum.md5
+    """
+}
+
 process COMPRESS_FASTQ {
     container 'community.wave.seqera.io/library/pigz:2.8--cc287835d69f818b'
 
@@ -82,12 +95,13 @@ process MANY_SMALL_FILES {
     """
     mkdir generated_files
     for i in \$(seq 1 ${num_files}); do
-        dd if=/dev/zero of=generated_files/file_\$i.bin bs=1M count=10
+        hex_name=\$(printf "%x" \$i)
+        dd if=/dev/zero of=generated_files/\${hex_name}.bin bs=1M count=10
     done
 
     # Generate MD5 checksums
     cd generated_files
-    md5sum * > ../checksum.txt
+    find . -name '*.bin' -exec md5sum {} + > ../checksum.txt
     """
 }
 
@@ -100,11 +114,14 @@ process COUNT_FILES {
 
     script:
     """
-    find ${files_folder}/* -type f | wc -l
+    cd ${files_folder}
+    find . -name '*.bin' -type f | wc -l
     """
 }
 
-process RENAME_FILES {
+process RENAME_AND_COMPRESS_FILES {
+    container 'community.wave.seqera.io/library/parallel:20240322--aeca7ef865f0e18b'
+
     input:
     path files_folder
 
@@ -114,43 +131,42 @@ process RENAME_FILES {
     script:
     """
     # First, create a copy of the original folder
-    cp -LR ${files_folder} original_files
+    cp -LR ${files_folder} copy_folder
 
     # Now create the renamed_files directory and move files there
     mkdir renamed_files
-    for file in original_files/*; do
-        mv \$file renamed_files/renamed_\$(basename \$file)
+    for file in copy_folder/*.bin; do
+        mv \$file renamed_files/\$(basename \$file)
     done
+
+    # Compress all the files
+    cd renamed_files
+    find . -name '*.bin' -type f | parallel -j ${task.cpus} gzip
+
     """
 }
 
-process COMPRESS_FILES {
+process UNCOMPRESS_AND_VERIFY_FILES {
+    container 'community.wave.seqera.io/library/parallel:20240322--aeca7ef865f0e18b'
+
     input:
     path files_folder
-
-    output:
-    path 'compressed_files.tar.gz'
-
-    script:
-    """
-    tar -czvf compressed_files.tar.gz -C \$(readlink -f ${files_folder}) .
-    """
-}
-
-
-process UNCOMPRESS_FILES {
-    input:
-    path compressed_file
     path original_checksum
 
+    output:
+    path 'verification.txt'
+
     script:
     """
-    mkdir uncompressed_files
-    tar -xzvf ${compressed_file} -C uncompressed_files
+     # First, create a copy of the original folder
+    cp -LR ${files_folder} uncompressed_files
+
+    # Uncompress files
+    cd uncompressed_files
+    find . -name '*.gz' -type f | parallel -j ${task.cpus} gzip -d
 
     # Verify checksums
-    cd uncompressed_files
-    md5sum -c ../${original_checksum} > verification_results.txt
+    md5sum -c ../${original_checksum} > ../verification.txt
     if grep -q 'FAILED' verification_results.txt; then
         echo "Checksum verification FAILED for some files"
         exit 1
@@ -177,17 +193,19 @@ workflow {
     // Compress the concatenated FASTQ file
     COMPRESS_FASTQ(CONCATENATE_FASTQ.out)
 
+    // Checksum a big file (big read with small write)
+    CHECKSUM_FASTQ(CONCATENATE_FASTQ.out)
+
     // Generate many small files in a single process
     small_files = MANY_SMALL_FILES(params.small_files)
 
     // Count how many files are generated
     COUNT_FILES(small_files.files) | view { "Number of small files: $it" }
 
-    // Rename all these files
-    RENAME_FILES(small_files.files)
+    // Rename and compress all these files
+    RENAME_AND_COMPRESS_FILES(small_files.files)
 
-    compressed = COMPRESS_FILES(small_files.files)
-
-    UNCOMPRESS_FILES(compressed, small_files.checksum)
+    // Extract and verify checksum of all the files
+    UNCOMPRESS_FILES(RENAME_AND_COMPRESS_FILES.out, small_files.checksum)
 
 }
