@@ -1,6 +1,9 @@
 process GENERATE_FAKE_FASTQ {
     container 'community.wave.seqera.io/library/numpy:2.1.1--3063fc3d721f2cdf'
 
+    cpus 2
+    memory { 4.GB * task.attempt }
+
     input:
     tuple val(total_reads), val(file_index)
 
@@ -43,6 +46,10 @@ process GENERATE_FAKE_FASTQ {
 }
 
 process CONCATENATE_FASTQ {
+
+    cpus 4
+    memory { 12.GB * task.attempt }
+
     input:
     path fastq_files
 
@@ -56,6 +63,10 @@ process CONCATENATE_FASTQ {
 }
 
 process CHECKSUM_FASTQ {
+
+    cpus 4
+    memory { 6.GB * task.attempt }
+
     input:
     path fastq_file
 
@@ -71,6 +82,9 @@ process CHECKSUM_FASTQ {
 process COMPRESS_FASTQ {
     container 'community.wave.seqera.io/library/pigz:2.8--cc287835d69f818b'
 
+    cpus 16
+    memory { 48.GB * task.attempt }
+
     input:
     path fastq_file
 
@@ -84,6 +98,10 @@ process COMPRESS_FASTQ {
 }
 
 process MANY_SMALL_FILES {
+
+    cpus 2
+    memory { 6.GB * task.attempt }
+
     input:
     val num_files
 
@@ -106,6 +124,10 @@ process MANY_SMALL_FILES {
 }
 
 process COUNT_FILES {
+
+    cpus 2
+    memory { 6.GB * task.attempt }
+
     input:
     path files_folder
 
@@ -121,6 +143,9 @@ process COUNT_FILES {
 
 process RENAME_AND_COMPRESS_FILES {
     container 'community.wave.seqera.io/library/parallel:20240322--aeca7ef865f0e18b'
+
+    cpus 16
+    memory { 48.GB * task.attempt }
 
     input:
     path files_folder
@@ -148,6 +173,9 @@ process RENAME_AND_COMPRESS_FILES {
 
 process UNCOMPRESS_AND_VERIFY_FILES {
     container 'community.wave.seqera.io/library/parallel:20240322--aeca7ef865f0e18b'
+
+    cpus 16
+    memory { 48.GB * task.attempt }
 
     input:
     path files_folder
