@@ -8,7 +8,7 @@ This repository contains a Nextflow pipeline for stress testing. The pipeline is
 
 - Nextflow
 - Java 17 or higher
-- Docker```
+- Docker
 
 ## Usage
 
