@@ -15,7 +15,7 @@ This repository contains a Nextflow pipeline for stress testing. The pipeline is
 To run the pipeline, use the following command:
 
 ```bash
-nextflow run nf-stresstest.nf
+nextflow run seqeralabs/nf-stresstest
 ```
 
 params usage:
