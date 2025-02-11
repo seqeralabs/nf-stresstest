@@ -7,8 +7,8 @@ This repository contains a Nextflow pipeline for stress testing. The pipeline is
 ## Requirements
 
 - Nextflow
-- Java 8 or higher
-- Docker or Singularity (optional, for containerized execution)
+- Java 17 or higher
+- Docker```
 
 ## Usage
 
