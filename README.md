@@ -34,5 +34,4 @@ nextflow run seqeralabs/nf-stresstest
 
 ## Credits
 
-nf-aggregate was written by the Scientific Development at [Seqera Labs](https://seqera.io/).
-
+nf-aggregate was written by the Scientific Development and Engineering at [Seqera Labs](https://seqera.io/).
