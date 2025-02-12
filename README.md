@@ -4,13 +4,13 @@
 
 ## Introduction
 
-**seqeralabs/nf-stresstest** is a Nextflow pipeline to Nextflow pipeline for stress testing, designed to simulate high computational loads and test the performance and stability of computational resources.
+**seqeralabs/nf-stresstest** is a Nextflow pipeline designed to simulate different scenarios of dealing with varying input data sizes (large files, many small files) in Nextflow.
 
 The pipeline performs the following stress tests on big files:
 
 1. Generate fake FASTQ files
-2. Concatenate said FASTQ files
-3. Compress them
+2. Concatenate generated FASTQ files
+3. Compress the FASTQ files
 4. Perform a md5checksum on the resulting archive
 
 In parallel the pipeline can also performs the following stress tests on small files:
@@ -31,6 +31,17 @@ This pipeline can be executed with the following command:
 ```
 nextflow run seqeralabs/nf-stresstest
 ```
+
+### Parameters
+
+You can modify the following parameters to adjust the file size and file number being created for stress testing, as well as which processes to selectively run or skip:
+
+| Parameter      | Description                                                      | Default |
+|----------------|------------------------------------------------------------------|---------|
+| `--total_reads`| Total number of reads per file (10k reads generates a ~1GB file) | 10000   |
+| `--num_files`  | Number of FASTQ files to generate in parallel and concatenate    | 10      |
+| `--run`        | Tools to selectively run                                         |         |
+| `--skip`       | Tools to selectively skip                                        |         |
 
 ## Credits
 
