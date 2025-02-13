@@ -4,7 +4,7 @@
 
 ## Introduction
 
-**seqeralabs/nf-stresstest** is a Nextflow pipeline designed to simulate different scenarios of dealing with varying input data sizes (large files, many small files) in Nextflow.
+**seqeralabs/nf-stresstest** is a Nextflow pipeline designed to simulate different scenarios of dealing with varying input data sizes (large files, many small files).
 
 The pipeline performs the following stress tests on big files:
 
